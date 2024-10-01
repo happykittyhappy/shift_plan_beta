@@ -1,0 +1,330 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+h1 {
+    width: 300px;
+    font-size: 24px;
+    text-align: center;
+    margin: 0px;
+    margin-top: 24px;
+}
+
+.login {
+    background-color: #fff;
+    width: 300px;
+    padding: 20px;
+    border-radius: 20px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+#logoutButton {
+    width: 80px;
+    height: 25px;
+    font-size: 14px;
+    background-color: #FFF1AD;
+    color: grey;
+    border: none;
+    border-radius: 15px;
+    cursor: pointer;
+    margin: 2px;
+    text-align: center;
+}
+
+#logoutButton:hover {
+    font-size: 18px;
+    background-color: #FFCB4A;
+    color: black;
+    transition: 0.2s;
+}
+
+input[type="text"], input[type="password"] {
+    width: 200px;
+    padding: 10px;
+    border-radius: 20px;
+    margin: 10px 0;
+    border: 1px solid #ccc;
+    font-size: 16px;
+    text-align: center;
+}
+
+input[type="text"]:focus, input[type="password"]:focus {
+    border-color: #4cae4c;
+    width: 280px;
+    transition: 0.5s;
+}
+
+input[type="submit"] {
+    width: 200px;
+    padding: 10px;
+    border-radius: 20px;
+    margin: 10px 0;
+    background-color: #4cae4c;
+    color: white;
+    border: 1px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+input[type="submit"]:hover {
+    background-color: #4cae4c;
+    width: 280px;
+    transition: 0.5s;
+}
+
+a {
+    display: block;
+    text-align: center;
+    margin-top: 10px;
+    color: #5cb85c;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+p {
+    font-size: 16px;
+    font-weight: bold;
+    text-align: center;
+    height: 5px;
+}
+
+#alertMessage {
+    font-size: 12px;
+}
+
+#access {
+    font-size: 14px;
+    height: 10px;
+}
+
+select {
+    width: 100px;
+    height: 30px;
+    margin: 5px 10px;
+    border-radius: 15px;
+    font-size: 16px;
+    align-items: center;
+    text-align: center;
+}
+
+#monthSelect {
+    width: 70px;
+}
+
+/* 通用樣式 */
+.calendar, .schedule {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.calendar-week-header, .calendar-header {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 3px;
+    font-size: medium;
+}
+
+.calendar-header {
+    color: navy;
+    font-weight: bold;
+    font-size: large;
+}
+
+.calendar-week-button, .calendar-header-cell {  
+    flex: 1;
+    width: 12.5%;
+    text-align: center;
+    /* font-weight: bold; */
+    padding: 3px;
+    cursor: pointer;
+}
+
+.calendar-week-button:hover, .calendar-header-cell:hover {
+    background-color: #ddd;
+    transition: background-color 0.3s;
+}
+.calendar-week {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+    margin-bottom: 3px;
+}
+
+.calendar-day {
+    flex: 1;
+    font-size: 16px;
+    text-align: center;
+    padding: 5px;
+    margin: 3px;
+    width: 30px;
+    cursor: pointer;
+    border: none;
+    background-color: lightgrey;
+    border-radius: 4px;
+}
+
+.calendar-day:hover {
+    font-size: 16px ;
+    font-weight: bold;
+    background-color: grey;
+    color: whitesmoke;
+}
+
+.calendar-day.selected {
+    background-color: darkblue;
+    color: white;
+}
+
+#calendar-container, #schedule-container {
+    display: flex;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.week-button {
+    background-color: #f0f0f0;
+    border: none;
+    padding: 5px;
+    margin-bottom: 5px;
+    cursor: pointer;
+}
+
+.week-button:hover {
+    background-color: #e0e0e0;
+}
+
+#saveButton, #arrangeButton, #importDataBtn, #generateTextButton {
+    width: 140px;
+    height: 40px;
+    /* padding: 5px ; */
+    font-size: 20px;
+    background-color: #5cb85c;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    /* display: block; */
+    margin: 15px;
+    /* align-items: center; */
+    text-align: center;
+}
+
+#arrangeButton, #importDataBtn {
+    background-color: #FF824A;
+}
+
+#saveButton:hover, #arrangeButton:hover, #importDataBtn:hover {
+    font-weight: bold;
+}
+
+.calendar-cell {
+    text-align: center;
+    padding: 10px;
+    border: 1px solid #ccc;
+    cursor: pointer;
+}
+
+.calendar-week-button {
+    background-color: #f0f0f0;
+    cursor: pointer;
+}
+
+.calendar-day {
+    background-color: #ffffff;
+}
+
+.calendar-day[data-date]:hover {
+    background-color: grey;
+}
+
+.calendar-week-button, #selectAllButton {
+    background-color: #ececec;
+    cursor: pointer;
+    border: none;
+    padding: 10px;
+    width: 100%;
+    height: 16px;
+}
+
+#selectAllButton {
+    margin: 0;
+    padding: 0;
+    text-align: center;
+}
+
+.prev-month, .next-month {
+    background-color: rgba(200, 200, 200, 0.2); /* 淡化背景顏色 */
+    color: darkolivegreen; /* 改變文字顏色 */
+}
+
+/* 專案人員資訊 */
+#usersInProject {
+    width: 300px;
+    color: lightskyblue;
+    font-size: small;
+    text-indent: 30%;
+    padding: 10px;
+    margin: 10px;
+    /* border: 1px solid #ddd; */
+    border-radius: 10px;
+    background-color: rgba(255, 218, 185, 0.151);
+    /* box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); */
+}
+
+#usersInProject:hover {
+    color: blue;
+    font-size: large;
+    background-color: #f9f9f9;
+    /* box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); */
+    transition: 0.5s;
+}
+
+.modal {
+    display: none; /* 隱藏模態框 */
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgb(0,0,0);
+    background-color: rgba(0,0,0,0.4);
+  }
+  
+  .modal-content {
+    background-color: #fefefe;
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%; /* 可以調整寬度 */
+    height: 80%;
+    max-width: 350px; /* 可以設定最大寬度 */
+  }
+  
+  .close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+  }
+  
+  .close:hover, .close:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+  }

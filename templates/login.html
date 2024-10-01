@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="{{ url_for('static', filename='images/favicon.png') }}" type="image/png">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>Login 登入</title>
+</head>
+<body>
+    <form id="login-form" method="POST" action="{{ url_for('login') }}" class="login">
+        <h1>Login 登入</h1>
+        <input type="text" name="userID" placeholder="User ID 帳號" required />
+        <input type="password" name="password" placeholder="Password 密碼" required />
+        <input type="submit" value="Submit 送出">
+        <a href="{{ url_for('register') }}">Register 註冊</a>
+    </form>
+</body>
+</html>

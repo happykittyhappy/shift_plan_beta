@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="{{ url_for('static', filename='images/favicon.png') }}" type="image/png">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>Calendar</title>
+</head>
+<body>
+    <form id="calendar-form" method="GET, POST" action="{{ url_for('calendar') }}" class="calendar">
+        <div>
+            <h1>個人排休月曆</h1>
+        </div>
+        <div>
+            <p id="name">{{ userName }}</p> <!-- 顯示使用者名稱 -->
+            <p id="access">{{ userGrade }}</p> <!-- 顯示使用者權限 -->
+        </div>
+        <span>
+            <button id="logoutButton" type="button">Logout</button>
+        </span>
+        <div>
+            <select id="yearSelect"></select>
+            <select id="monthSelect"></select>
+        </div>
+        <div id="calendar-container">
+            <div id="calendar"></div>
+        </div>
+        <div>
+            <button id="saveButton" type="button">儲存日期</button>
+            {% if show_schedule_button %}
+            <button onclick="window.location.href='/schedule'" id="arrangeButton" type="button">進入排班</button>
+            {% endif %}
+        </div>
+    </form>
+
+    <script>
+        // 修改後的登出功能
+        document.getElementById('logoutButton').addEventListener('click', function () {
+            fetch('/logout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }).then(response => {
+                if (response.ok) {
+                    window.location.href = '/login';  // 重定向到登入頁面
+                } else {
+                    console.log('Logout failed with status:', response.status);
+                    alert('Failed to logout.');
+                }
+            }).catch(error => {
+                console.error('Error during logout:', error);
+                alert('Failed to logout.');
+            });
+        });
+
+        const yearSelect = document.getElementById('yearSelect');
+        const monthSelect = document.getElementById('monthSelect');
+        const calendarDiv = document.getElementById('calendar');
+        const currentYear = new Date().getFullYear();
+        
+        // 設置年份和月份選項
+        for (let i = currentYear; i <= currentYear + 5; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.text = i + " 年";
+            yearSelect.appendChild(option);
+        }
+        yearSelect.value = currentYear;
+        let year = yearSelect.value
+
+        for (let i = 1; i <= 12; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.text = i + " 月";
+            monthSelect.appendChild(option);
+        }
+        monthSelect.value = new Date().getMonth() + 1;
+        let month = monthSelect.value
+
+        
+        let currentYearMonth = `${yearSelect.value}-${monthSelect.value}`;
+        // let savedDates = [];  // 預設為空數組，後面會透過 AJAX 請求動態更新
+        let savedDates = {{ current_month_dates|tojson }};
+        
+        let unselectedDates = []
+        
+        // 檢查 savedDates 是否為物件或陣列
+        let savedDays = Array.isArray(savedDates)? savedDates.filter(date => date.startsWith(currentYearMonth)).map(date => parseInt(date.split('-')[2])): [];
+        
+        let selectedDates = [];
+
+
+        document.getElementById('monthSelect').addEventListener('change', function() {
+            userNo = {{userNo}};
+            year = document.getElementById('yearSelect').value;
+            month = this.value;
+            updateCalendar(userNo, year, month);
+        });
+
+        document.getElementById('yearSelect').addEventListener('change', function() {
+            userNo = {{userNo}};
+            year = this.value;
+            month = document.getElementById('monthSelect').value;
+            updateCalendar(userNo, year, month);
+        });
+
+        // 初始加載時調用
+        updateCalendar({{ userNo }}, yearSelect.value, monthSelect.value);
+
+        function updateCalendar(userNo, year, month) {
+            
+            // console.log("updateCalendar triggered");  // 確認函數被呼叫
+            
+            // 發送 AJAX 請求以獲取對應月份的儲存日期
+            fetch(`/get_saved_dates?userNo=${userNo}&year=${year}&month=${month}`)
+                .then(response => response.json())
+                .then(data => {
+                    // console.log("Fetched JSON data:", data);
+
+                    // 更新 currentYearMonth
+                    currentYearMonth = `${year}-${month}`;
+            
+                    // 使用 fetch 獲得的資料更新 savedDates
+                    savedDates = data.current_month_dates || [];
+                    savedDays = savedDates.filter(date => date.startsWith(currentYearMonth)).map(date => parseInt(date.split('-')[2]));
+
+                    console.log("Fetched savedDates:", savedDates);  // 確認資料被正確抓取
+
+                    // 清空當前選取的日期
+                    selectedDates = [];
+                    unselectedDates = [];
+                    
+                    // 更新日曆顯示
+                    data.current_month_dates.forEach(date => {
+                        const day = parseInt(date.split('-')[2]);
+                        const dateButton = document.querySelector(`[data-date='${day}']`);
+                        if (dateButton) {
+                            dateButton.style.backgroundColor = '#B4F06E'; // 已儲存日期的顏色
+                            selectedDates.push(day);
+                        }
+                    });
+                });
+        }
+
+        
+
+        // 添加首欄 (Week 1~6 + 全選按鈕)
+        const weekHeader = document.createElement('div');
+        weekHeader.className = 'calendar-week-header';
+        for (let i = 2; i <= 7; i++) {
+            const weekButton = document.createElement('div');
+            weekButton.innerText = `W${i - 1}`;
+            weekButton.className = 'calendar-week-button';
+            weekButton.dataset.week = i;
+            weekButton.addEventListener('click', function () {
+                const weekIndex = parseInt(weekButton.dataset.week) - 1;
+                const weekRow = document.querySelectorAll(`.calendar-week:nth-child(${weekIndex + 2}) .calendar-day`);
+                const allSelected = Array.from(weekRow).every(btn => {
+                    const date = parseInt(btn.dataset.date);
+                    return selectedDates.includes(date) && !btn.classList.contains('prev-month') && !btn.classList.contains('next-month');
+                });
+                
+                weekRow.forEach(btn => {
+                    const date = parseInt(btn.dataset.date);
+                    if (!btn.classList.contains('prev-month') && !btn.classList.contains('next-month')) {
+                        if (allSelected) {
+                            selectedDates = selectedDates.filter(d => d !== date);
+                            btn.style.backgroundColor = '';
+
+                            if (savedDays.includes(date) && !unselectedDates.includes(date)) {
+                                unselectedDates.push(date);
+                            }
+                        } else {
+                            if (!selectedDates.includes(date)) {
+                                selectedDates.push(date);
+                                btn.style.backgroundColor = '#6EC0F0';
+                            }
+                            
+                            if (savedDays.includes(date)) {
+                                unselectedDates = unselectedDates.filter(d => d !== date);  // 從 unselectedDates 中移除該日期
+                            }
+                        }
+                    }
+                });
+            });
+            weekHeader.appendChild(weekButton);
+        }
+
+        // 添加全選按鈕代替 Week 6
+        const selectAllButton = document.createElement('div');
+        selectAllButton.innerText = '全';
+        selectAllButton.className = 'calendar-week-button';
+        selectAllButton.addEventListener('click', function () {
+            const allSelected = selectedDates.length === document.querySelectorAll('.calendar-day[data-date]').length;
+            document.querySelectorAll('.calendar-day[data-date]').forEach(btn => {
+                const date = parseInt(btn.dataset.date);
+                if (allSelected) {
+                    selectedDates = [];
+                    btn.style.backgroundColor = '';
+
+                    if (savedDays.includes(date) && !unselectedDates.includes(date)) {
+                        unselectedDates.push(date);
+                    }
+                } else if (!btn.classList.contains('prev-month') && !btn.classList.contains('next-month')) {
+                    if (!selectedDates.includes(date)) {
+                        selectedDates.push(date);
+                        btn.style.backgroundColor = '#6EC0F0';
+                    }
+
+                    if (savedDays.includes(date)) {
+                        unselectedDates = unselectedDates.filter(d => d !== date);  // 從 unselectedDates 中移除該日期
+                    }
+                }
+            });
+        });
+        weekHeader.appendChild(selectAllButton);
+        calendarDiv.appendChild(weekHeader);
+
+        // 渲染星期標題，只需執行一次
+        function renderCalendarHeader() {
+            const daysOfWeek = ['日', '一', '二', '三', '四', '五', '六'];
+            const headerRow = document.createElement('div');
+            headerRow.className = 'calendar-header';
+            daysOfWeek.forEach(day => {
+                const headerCell = document.createElement('div');
+                headerCell.innerText = day;
+                headerCell.className = 'calendar-header-cell';
+                headerCell.addEventListener('click', function () {
+                    const dayIndex = daysOfWeek.indexOf(day);
+                    const dateButtons = document.querySelectorAll(`.calendar-day[data-day='${dayIndex}']`);
+                    const allSelected = Array.from(dateButtons).every(btn => selectedDates.includes(parseInt(btn.dataset.date)));
+                    dateButtons.forEach(btn => {
+                        const date = parseInt(btn.dataset.date);
+                        if (allSelected) {
+                            selectedDates = selectedDates.filter(d => d !== date);
+                            btn.style.backgroundColor = '';
+
+                            if (savedDays.includes(date) && !unselectedDates.includes(date)) {
+                                unselectedDates.push(date);
+                            }
+                        } else {
+                            if (!selectedDates.includes(date)) {
+                                selectedDates.push(date);
+                                btn.style.backgroundColor = '#6EC0F0';
+                            }
+
+                            if (savedDays.includes(date)) {
+                                unselectedDates = unselectedDates.filter(d => d !== date);  // 從 unselectedDates 中移除該日期
+                            }
+                        }
+                    });
+                });
+                headerRow.appendChild(headerCell);
+            });
+            calendarDiv.appendChild(headerRow);
+        }
+
+        // 更新日曆的主要渲染函數
+        function renderCalendar() {
+            
+            const year = parseInt(yearSelect.value);
+            const month = parseInt(monthSelect.value);
+
+            // 每次重新渲染日曆時更新 currentYearMonth
+            currentYearMonth = `${yearSelect.value}-${monthSelect.value}`;
+            
+            
+            // // 使用 currentYearMonth 來過濾或處理 savedDates
+            savedDates = {{ current_month_dates|tojson }};
+
+            // 過濾出對應月份的 savedDates
+            savedDays = Array.isArray(savedDates) ? savedDates.filter(date => date.startsWith(currentYearMonth)).map(date => parseInt(date.split('-')[2])) : [];
+
+
+            const dateRows = document.querySelectorAll('.calendar-week');
+            dateRows.forEach(row => row.remove());
+
+            
+            const firstDay = new Date(year, month - 1, 1).getDay();
+            const daysInMonth = new Date(year, month, 0).getDate();
+            const daysInPrevMonth = new Date(year, month - 1, 0).getDate();
+
+            let dayCounter = 1;
+            let nextMonthDayCounter = 1;
+
+            for (let week = 0; week < 6; week++) {  // 最多六周
+                const weekRow = document.createElement('div');
+                weekRow.className = 'calendar-week';
+
+                for (let day = 0; day < 7; day++) {
+                    const dateButton = document.createElement('div');
+                    dateButton.className = 'calendar-day';
+                    
+                    if (week === 0 && day < firstDay) {
+                        // 前一個月的日期
+                        dateButton.innerText = daysInPrevMonth - (firstDay - day - 1);
+                        dateButton.style.color = 'darkolivegreen';
+                        dateButton.classList.add('prev-month');
+                        dateButton.style.backgroundColor = 'rgba(200, 200, 200, 0.2)';
+                    } else if (dayCounter <= daysInMonth) {
+                        // 當月日期
+                        dateButton.innerText = dayCounter;
+                        dateButton.dataset.date = dayCounter;
+                        dateButton.dataset.day = day;
+                        
+                        // 事件綁定
+                        dateButton.addEventListener('click', function () {
+                            const date = parseInt(dateButton.dataset.date);
+                            if (selectedDates.includes(date)) {
+                                // 如果日期已選取，則取消選取
+                                selectedDates = selectedDates.filter(d => d !== date);
+                                dateButton.style.backgroundColor = '';
+                                
+                                // 如果是已儲存日期且目前未在 unselectedDates 中，則添加進去
+                                if (savedDays.includes(date) && !unselectedDates.includes(date)) {
+                                    unselectedDates.push(date);
+                                }
+
+                            } else {
+                                // 如果日期未選取，則進行選取
+                                selectedDates.push(date);
+                                dateButton.style.backgroundColor = '#6EC0F0';
+
+                                // 如果是已儲存日期且在 unselectedDates 中，則移除
+                                if (savedDays.includes(date)) {
+                                    unselectedDates = unselectedDates.filter(d => d !== date);
+                                }
+                            }
+
+                        });
+
+                        // 已保存的日期顯示顏色
+                        if (savedDays.includes(dayCounter)) {
+                            dateButton.style.backgroundColor = '#B4F06E';
+                            if (!selectedDates.includes(dayCounter)) {
+                                selectedDates.push(dayCounter);  // 確保已保存的日期在 `selectedDates` 中
+                            }
+                        }
+                        
+                        
+                        dayCounter++;
+                    } else {
+                        // 下一個月的日期
+                        dateButton.innerText = nextMonthDayCounter++;
+                        dateButton.style.color = 'darkolivegreen';
+                        dateButton.classList.add('next-month');
+                        dateButton.style.backgroundColor = 'rgba(200, 200, 200, 0.2)';
+                    }
+                    weekRow.appendChild(dateButton);
+                }
+                calendarDiv.appendChild(weekRow);
+            }
+        }
+
+        // 加載頁面時先渲染星期標題和當月日曆
+        renderCalendarHeader();
+        renderCalendar();
+
+        // 繫結事件來更新日曆
+        yearSelect.addEventListener('change', renderCalendar);
+        monthSelect.addEventListener('change', renderCalendar);
+
+        document.getElementById('saveButton').addEventListener('click', function () {
+            event.preventDefault();  // 阻止表單的默認提交行為
+            const year = yearSelect.value;
+            const month = monthSelect.value;
+            userNo = {{ userNo }};  // userNo 已經指向使用者的 ID
+                        
+            // 計算新增的日期和刪除的日期
+            let addedDates = selectedDates.map(day => `${year}-${month}-${day}`);
+            let removedDates = unselectedDates.map(day => `${year}-${month}-${day}`);
+
+            let data = {
+                userNo: userNo,  // 確認這裡傳遞的是 userNo
+                added_dates: addedDates,
+                removed_dates: removedDates,
+                month: month,
+                year: year
+            };
+            
+            fetch('/save_dates', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('資料儲存成功。\n Dates saved successfully!');
+                } else {
+                    alert('資料儲存失敗。\n Failed to save dates.');
+                }
+            })
+
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        });
+    </script>
+</body>
+</html>

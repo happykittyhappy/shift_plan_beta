@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="{{ url_for('static', filename='images/favicon.png') }}" type="image/png">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<title>Schedule Page</title>
+</head>
+<body>
+    <form id="schedule-form" method="POST" action="{{ url_for('schedule') }}" class="calendar">
+        <div>
+            <h1>專案排班月曆</h1>
+        </div>
+        <div>
+            <p id="name">專案名稱 : {{ projectName }}</p> <!-- 顯示專案名稱 -->
+            <!-- 這是html要呈現專案使用者資訊的標籤 -->
+            <div id="usersInProject">專案參與人員</div>
+        </div>
+        <div>
+            <button id="logoutButton" type="button">Logout</button>
+        </div>
+        <div>
+            <select id="yearSelect"></select>
+            <select id="monthSelect"></select>
+            <select id="workerCountSelect"></select>
+        </div>
+        <!-- <div class="date" >
+            <span class="worker-count">0</span>
+            <button class="increase-btn">+</button>
+            <button class="decrease-btn">-</button>
+        </div> -->
+        <div id="schedule-container">
+            <div id="schedule"></div>
+        </div>
+        <div>
+            <button id="importDataBtn" type="button">匯入資料</button>
+            <!-- <button id="generateTextButton">排班總表</button> -->
+        </div>
+        <div id="customAlert" class="modal">
+            <div class="modal-content">
+              <span class="close">&times;</span>
+              <p id="alertMessage"></p>
+            </div>
+          </div>
+          <!-- <button onclick="showCustomAlert()">排班總表</button> -->
+    </form>
+
+    <script>
+        // 修改後的登出功能
+        document.getElementById('logoutButton').addEventListener('click', function () {
+            fetch('/logout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }).then(response => {
+                if (response.ok) {
+                    window.location.href = '/login';  // 重定向到登入頁面
+                } else {
+                    console.log('Logout failed with status:', response.status);
+                    alert('Failed to logout.');
+                }
+            }).catch(error => {
+                console.error('Error during logout:', error);
+                alert('Failed to logout.');
+            });
+        });
+        
+        // 使用Jinja2將資料庫中的資料轉換為JavaScript變數
+        const usersInProjectNo = {{ usersInProjectNo|tojson }};
+        const usersInProjectName = {{ usersInProjectName|tojson }};
+        const projectName = {{ projectName|tojson }};
+
+        // 獲取用戶列表容器
+        const userListContainer = document.getElementById('usersInProject');
+
+        // 生成用戶列表
+        for (let i = 0; i < usersInProjectNo.length; i++) {
+            let userDiv = document.createElement('div');
+            userDiv.textContent = `No.${usersInProjectNo[i]} : ${usersInProjectName[i]}`;
+            userListContainer.appendChild(userDiv);
+        }
+        
+       
+        document.querySelectorAll('.increase-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                let countSpan = this.parentNode.querySelector('.worker-count');
+                countSpan.textContent = parseInt(countSpan.textContent) + 1;
+            });
+        });
+
+        document.querySelectorAll('.decrease-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                let countSpan = this.parentNode.querySelector('.worker-count');
+                countSpan.textContent = Math.max(0, parseInt(countSpan.textContent) - 1);
+            });
+        });
+
+        document.addEventListener("DOMContentLoaded", function() {
+            renderCalendar();
+        });
+
+        document.getElementById('workerCountSelect').addEventListener('change', function() {
+            const workerCount = this.value;
+            document.querySelectorAll('.worker-count').forEach(elem => {
+                elem.textContent = workerCount;
+            });
+        });
+
+        const yearSelect = document.getElementById('yearSelect');
+        const monthSelect = document.getElementById('monthSelect');
+        const calendarDiv = document.getElementById('schedule');
+        const currentYear = new Date().getFullYear();
+        
+        // 設置年份和月份選項
+        for (let i = currentYear; i <= currentYear + 5; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.text = i + " 年";
+            yearSelect.appendChild(option);
+        }
+        yearSelect.value = currentYear;
+
+        for (let i = 1; i <= 12; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.text = i + " 月";
+            monthSelect.appendChild(option);
+        }
+        monthSelect.value = new Date().getMonth() + 1;
+
+        // 動態抓取匯入的人數
+        let i = usersInProjectNo.length
+        usersInProjectNo.forEach(user => {
+            const option = document.createElement('option');
+            option.value = i;
+            option.text = "每天 " + i + " 人";
+            workerCountSelect.appendChild(option);
+            i--;
+        });
+        workerCountSelect.value = usersInProjectNo.length;
+        
+        document.getElementById('monthSelect').addEventListener('change', function() {
+            let year = document.getElementById('yearSelect').value;
+            let month = this.value;
+            updateCalendar(year, month);
+        });
+
+        document.getElementById('yearSelect').addEventListener('change', function() {
+            let year = this.value;
+            let month = document.getElementById('monthSelect').value;
+            updateCalendar(year, month);
+        });
+
+        function updateCalendar(year, month) {
+            // 發送 AJAX 請求以獲取對應月份的儲存日期
+            fetch(`/calendar?year=${year}&month=${month}`)
+                .then(response => response.json())
+                .then(data => {
+                    
+                    // 清空當前選取的日期
+                    selectedDates = [];
+                    unselectedDates = [];
+
+                    // 更新日曆顯示
+                    data.saved_dates.forEach(date => {
+                        const day = parseInt(date.split('-')[2]);
+                        const dateButton = document.querySelector(`[data-date='${day}']`);
+                        if (dateButton) {
+                            dateButton.style.backgroundColor = '#6EC0F0'; // 已儲存日期的顏色
+                            selectedDates.push(day);
+                        }
+                    });
+                });
+        }
+
+
+
+        // 添加首欄 (Week 1~6 + 全選按鈕)
+        const weekHeader = document.createElement('div');
+        weekHeader.className = 'calendar-week-header';
+        for (let i = 2; i <= 7; i++) {
+            const weekButton = document.createElement('div');
+            weekButton.innerText = `W${i - 1}`;
+            weekButton.className = 'calendar-week-button';
+            weekButton.dataset.week = i;
+            weekButton.addEventListener('click', function () {
+                const weekIndex = parseInt(weekButton.dataset.week) - 1;
+                const weekRow = document.querySelectorAll(`.calendar-week:nth-child(${weekIndex + 2}) .calendar-day`);
+                const allSelected = Array.from(weekRow).every(btn => {
+                    const date = parseInt(btn.dataset.date);
+                    return selectedDates.includes(date) && !btn.classList.contains('prev-month') && !btn.classList.contains('next-month');
+                });
+                
+                weekRow.forEach(btn => {
+                    const date = parseInt(btn.dataset.date);
+                    if (!btn.classList.contains('prev-month') && !btn.classList.contains('next-month')) {
+                        if (allSelected) {
+                            selectedDates = selectedDates.filter(d => d !== date);
+                            btn.style.backgroundColor = '';
+
+                        } else {
+                            if (!selectedDates.includes(date)) {
+                                selectedDates.push(date);
+                                btn.style.backgroundColor = '#6EC0F0';
+                            }
+
+                        }
+                    }
+                });
+            });
+            weekHeader.appendChild(weekButton);
+        }
+
+        // 添加全選按鈕代替 Week 6
+        const selectAllButton = document.createElement('div');
+        selectAllButton.innerText = '全';
+        selectAllButton.className = 'calendar-week-button';
+        selectAllButton.addEventListener('click', function () {
+            const allSelected = selectedDates.length === document.querySelectorAll('.calendar-day[data-date]').length;
+            document.querySelectorAll('.calendar-day[data-date]').forEach(btn => {
+                const date = parseInt(btn.dataset.date);
+                if (allSelected) {
+                    selectedDates = [];
+                    btn.style.backgroundColor = '';
+
+                } else if (!btn.classList.contains('prev-month') && !btn.classList.contains('next-month')) {
+                    if (!selectedDates.includes(date)) {
+                        selectedDates.push(date);
+                        btn.style.backgroundColor = '#6EC0F0';
+                    }
+
+                }
+            });
+        });
+        weekHeader.appendChild(selectAllButton);
+        calendarDiv.appendChild(weekHeader);
+
+        let selectedDates = [];
+
+        // 渲染星期標題，只需執行一次
+        function renderCalendarHeader() {
+            const daysOfWeek = ['日', '一', '二', '三', '四', '五', '六'];
+            const headerRow = document.createElement('div');
+            headerRow.className = 'calendar-header';
+            daysOfWeek.forEach(day => {
+                const headerCell = document.createElement('div');
+                headerCell.innerText = day;
+                headerCell.className = 'calendar-header-cell';
+                headerCell.addEventListener('click', function () {
+                    const dayIndex = daysOfWeek.indexOf(day);
+                    const dateButtons = document.querySelectorAll(`.calendar-day[data-day='${dayIndex}']`);
+                    const allSelected = Array.from(dateButtons).every(btn => selectedDates.includes(parseInt(btn.dataset.date)));
+                    dateButtons.forEach(btn => {
+                        const date = parseInt(btn.dataset.date);
+                        if (allSelected) {
+                            selectedDates = selectedDates.filter(d => d !== date);
+                            btn.style.backgroundColor = '';
+
+                        } else {
+                            if (!selectedDates.includes(date)) {
+                                selectedDates.push(date);
+                                btn.style.backgroundColor = '#6EC0F0';
+                            }
+
+                        }
+                    });
+                });
+                headerRow.appendChild(headerCell);
+            });
+            calendarDiv.appendChild(headerRow);
+        }
+
+        // 更新日曆的主要渲染函數
+        function renderCalendar() {
+            
+            const year = parseInt(yearSelect.value);
+            const month = parseInt(monthSelect.value);
+
+            // 每次重新渲染日曆時更新 currentYearMonth
+            let currentYearMonth = `${yearSelect.value}-${String(monthSelect.value).padStart(2, '0')}`;
+            
+            const dateRows = document.querySelectorAll('.calendar-week');
+            dateRows.forEach(row => row.remove());
+
+            const firstDay = new Date(year, month - 1, 1).getDay();
+            const daysInMonth = new Date(year, month, 0).getDate();
+            const daysInPrevMonth = new Date(year, month - 1, 0).getDate();
+
+            let dayCounter = 1;
+            let nextMonthDayCounter = 1;
+
+            for (let week = 0; week < 6; week++) {  // 最多六周
+                const weekRow = document.createElement('div');
+                weekRow.className = 'calendar-week';
+
+                for (let day = 0; day < 7; day++) {
+                    const dateButton = document.createElement('div');
+                    dateButton.className = 'calendar-day';
+                    
+                    if (week === 0 && day < firstDay) {
+                        // 前一個月的日期
+                        dateButton.innerText = daysInPrevMonth - (firstDay - day - 1);
+                        dateButton.style.color = 'darkolivegreen';
+                        dateButton.classList.add('prev-month');
+                        dateButton.style.backgroundColor = 'rgba(200, 200, 200, 0.2)';
+                    } else if (dayCounter <= daysInMonth) {
+                        // 當月日期
+                        dateButton.innerText = dayCounter;
+                        dateButton.dataset.date = dayCounter;
+                        dateButton.dataset.day = day;
+                        
+                        // 事件綁定
+                        dateButton.addEventListener('click', function () {
+                            const date = parseInt(dateButton.dataset.date);
+                            if (selectedDates.includes(date)) {
+                                // 如果日期已選取，則取消選取
+                                selectedDates = selectedDates.filter(d => d !== date);
+                                dateButton.style.backgroundColor = '';
+                                
+
+                            } else {
+                                // 如果日期未選取，則進行選取
+                                selectedDates.push(date);
+                                dateButton.style.backgroundColor = '#6EC0F0';
+
+                            }
+
+                        });
+                      
+                        dayCounter++;
+                    } else {
+                        // 下一個月的日期
+                        dateButton.innerText = nextMonthDayCounter++;
+                        dateButton.style.color = 'darkolivegreen';
+                        dateButton.classList.add('next-month');
+                        dateButton.style.backgroundColor = 'rgba(200, 200, 200, 0.2)';
+                    }
+                    weekRow.appendChild(dateButton);
+                }
+                calendarDiv.appendChild(weekRow);
+            }
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // 加載頁面時先渲染星期標題和當月日曆
+        renderCalendarHeader();
+        renderCalendar();
+
+        // 繫結事件來更新日曆
+        yearSelect.addEventListener('change', renderCalendar);
+        monthSelect.addEventListener('change', renderCalendar);
+
+        document.getElementById('importDataBtn').addEventListener('click', function () {
+            event.preventDefault();  // 阻止表單的默認提交行為
+        
+            const year = yearSelect.value;
+            const month = monthSelect.value;
+            // const day = new Date().getDate();
+            const reqHum = workerCountSelect.value
+            const output = ''
+            
+            const imageName = `schedule_${year}年${String(month).padStart(2, '0')}月班表.jpg`;  // 這裡要寫完檔案名稱
+            // 構建圖片完整路徑
+            const imagePath = `{{ url_for('static', filename='images/') }}${imageName}`;
+
+            // 構建 alert 的 HTML 內容
+            const imageHtml = `<img src="${imagePath}" alt="Imported Image" style="max-width:100%;">`;
+
+            
+            // 計算新增的日期
+            // let addedDates = selectedDates.map(day => `${year}-${month}-${String(day).padStart(2, '0')}`);
+            let addedDates = selectedDates.map(day => `${year}-${month}-${String(day)}`);   // 要匯入的日期格式不用補零
+            
+            let data = {
+                added_dates: addedDates,
+                month: month,
+                year: year,
+                reqHum: reqHum,
+                usersInProjectNo: usersInProjectNo,
+                usersInProjectName: usersInProjectName,
+                projectName: projectName
+            };
+            
+            fetch('/import_schedule_data', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert('資料匯入成功。\n Dates imported successfully!');
+                alert("排班結果：\n" +  data.results);
+                // const output = data.results
+                // showCustomAlert(output)
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+
+            // 設定1秒空檔，讓網頁不要太早抓取圖片
+            // 使用 SweetAlert 或類似庫顯示圖片
+            sleep(1500).then(() => 
+            swal.fire({
+                title: `【${projectName}】 ${year}年${month}月班表`,
+                html: imageHtml,
+                showCloseButton: true,
+                focusConfirm: false,
+                confirmButtonText: '關閉'
+            }));
+        });
+
+        // function showCustomAlert(output) {
+        //     const modal = document.getElementById("customAlert");
+        //     const span = document.getElementsByClassName("close")[0];
+        //     const alertMessage = document.getElementById("alertMessage");
+
+        //     alertMessage.textContent = output;
+
+        //     modal.style.display = "block";
+
+        //     span.onclick = function() {
+        //         modal.style.display = "none";
+        //     }
+
+        //     window.onclick = function(event) {
+        //         if (event.target == modal) {
+        //             modal.style.display = "none";
+        //         }
+        //     }
+        // }
+        
+    </script>
+</body>
+</html>
